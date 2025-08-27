@@ -48,9 +48,11 @@ jobs:
               "repositoryUrl": ("https://github.com/" + $repo),
               "deployStatus": "✅ Деплой успешен",
               "hashtag": ("#" + $hashtag)
-            }' | curl -X POST ${{ secrets.NOTIFICATION_SERVICE_URL }}/notifications/commit \
+            }' | curl -X POST http://5.129.234.22:4000/notifications/commit \
             -H "Content-Type: application/json" \
-            -d @-
+            -d @- \
+            -w "\nHTTP Status: %{http_code}\n" \
+            -s
 
       - name: Send notification on failure
         if: ${{ inputs.DEPLOY_STATUS == 'failure' }}
@@ -70,6 +72,8 @@ jobs:
               "repositoryUrl": ("https://github.com/" + $repo),
               "deployStatus": ("❌ Ошибка деплоя: " + $runUrl),
               "hashtag": ("#" + $hashtag)
-            }' | curl -X POST ${{ secrets.NOTIFICATION_SERVICE_URL }}/notifications/commit \
+            }' | curl -X POST http://5.129.234.22:4000/notifications/commit \
             -H "Content-Type: application/json" \
-            -d @-
+            -d @- \
+            -w "\nHTTP Status: %{http_code}\n" \
+            -s

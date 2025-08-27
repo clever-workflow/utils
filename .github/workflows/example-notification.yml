@@ -1,0 +1,20 @@
+name: Example Notifications
+
+on:
+  push:
+    branches: [ main, develop, master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy step
+        run: echo "Deploy completed"
+
+  notification:
+    needs: deploy
+    if: always()
+    uses: clever-workflow/utils/.github/workflows/notify-commit.yml@main
+    with:
+      HASHTAG: "Oogroup"
+      DEPLOY_STATUS: ${{ needs.deploy.result }}
