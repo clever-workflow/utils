@@ -1,0 +1,75 @@
+name: Send notification to telegram
+
+on:
+  workflow_call:
+    inputs:
+      DEPLOY_STATUS:
+        required: true
+        type: string
+      HASHTAG:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get commit info
+        id: commit
+        run: |
+          echo "author=$(git log -1 --pretty=format:'%an' | sed 's/"/\\"/g')" >> $GITHUB_OUTPUT
+          echo "message=$(git log -1 --pretty=format:'%s' | sed 's/"/\\"/g')" >> $GITHUB_OUTPUT
+          echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+          echo "repository=${GITHUB_REPOSITORY}" >> $GITHUB_OUTPUT
+
+      - name: Send notification on success
+        if: ${{ inputs.DEPLOY_STATUS == 'success' }}
+        run: |
+          jq -n \
+            --arg repo "${{ steps.commit.outputs.repository }}" \
+            --arg author "${{ steps.commit.outputs.author }}" \
+            --arg message "${{ steps.commit.outputs.message }}" \
+            --arg branch "${{ steps.commit.outputs.branch }}" \
+            --arg hashtag "${{ inputs.HASHTAG }}" \
+            '{
+              "repositoryName": $repo,
+              "author": $author,
+              "commitMessage": $message,
+              "branch": $branch,
+              "repositoryUrl": ("https://github.com/" + $repo),
+              "deployStatus": "✅ Деплой успешен",
+              "hashtag": ("#" + $hashtag)
+            }' | curl -X POST ${{ secrets.NOTIFICATION_SERVICE_URL }}/notifications/commit \
+            -H "Content-Type: application/json" \
+            -d @-
+
+      - name: Send notification on failure
+        if: ${{ inputs.DEPLOY_STATUS == 'failure' }}
+        run: |
+          jq -n \
+            --arg repo "${{ steps.commit.outputs.repository }}" \
+            --arg author "${{ steps.commit.outputs.author }}" \
+            --arg message "${{ steps.commit.outputs.message }}" \
+            --arg branch "${{ steps.commit.outputs.branch }}" \
+            --arg hashtag "${{ inputs.HASHTAG }}" \
+            --arg runUrl "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{
+              "repositoryName": $repo,
+              "author": $author,
+              "commitMessage": $message,
+              "branch": $branch,
+              "repositoryUrl": ("https://github.com/" + $repo),
+              "deployStatus": ("❌ Ошибка деплоя: " + $runUrl),
+              "hashtag": ("#" + $hashtag)
+            }' | curl -X POST ${{ secrets.NOTIFICATION_SERVICE_URL }}/notifications/commit \
+            -H "Content-Type: application/json" \
+            -d @-
